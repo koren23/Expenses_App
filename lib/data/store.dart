@@ -134,6 +134,10 @@ class Store extends ChangeNotifier {
 
   Future<void> setDefaultIncome(double v) {
     defaultIncome = v;
+    // Every month using the default income needs a fresh PDF.
+    for (final k in months) {
+      if (hasData(k) && !hasIncomeOverride(k)) _touch(k);
+    }
     return _save();
   }
 
@@ -166,16 +170,29 @@ class Store extends ChangeNotifier {
     return _save();
   }
 
-  /// Past months whose PDF is missing or older than their data.
-  List<MonthKey> get pendingAutoExports {
+  /// Whether the month has anything worth a PDF.
+  bool hasData(MonthKey k) =>
+      expensesFor(k).isNotEmpty ||
+      extrasFor(k).isNotEmpty ||
+      hasIncomeOverride(k);
+
+  /// Months whose PDF is missing, older than their data, or should be
+  /// deleted (data removed). [pastOnly] limits it to months that ended.
+  List<MonthKey> pendingExports({bool pastOnly = false}) {
     final now = MonthKey.now();
-    return months.where((k) {
-      if (k.compareTo(now) >= 0) return false;
-      if (expensesFor(k).isEmpty && extrasFor(k).isEmpty) return false;
+    final keys = {
+      ...months,
+      for (final k in _modifiedAt.keys) MonthKey.parse(k),
+      for (final k in _exportedAt.keys) MonthKey.parse(k),
+    };
+    return (keys.where((k) {
+      if (pastOnly && k.compareTo(now) >= 0) return false;
       final exported = _exportedAt[k.toString()];
+      if (!hasData(k)) return exported != null;
       final modified = _modifiedAt[k.toString()] ?? 0;
       return exported == null || exported < modified;
-    }).toList();
+    }).toList())
+      ..sort();
   }
 
   DateTime? exportedAt(MonthKey k) {
@@ -185,6 +202,13 @@ class Store extends ChangeNotifier {
 
   Future<void> markExported(MonthKey k) {
     _exportedAt[k.toString()] = DateTime.now().millisecondsSinceEpoch;
+    return _save();
+  }
+
+  /// The month's PDF was deleted.
+  Future<void> clearExported(MonthKey k) {
+    _exportedAt.remove(k.toString());
+    _modifiedAt.remove(k.toString());
     return _save();
   }
 }

@@ -8,6 +8,8 @@ import 'pdf_storage.dart';
 
 const canSaveSilently = false;
 
+bool get hasPublicFolder => false;
+
 Future<String> save(String fileName, Uint8List bytes) async {
   final file = web.File(
     [bytes.toJS].toJS,
@@ -29,5 +31,13 @@ Future<String> save(String fileName, Uint8List bytes) async {
 }
 
 Future<List<SavedPdf>> list() async => const [];
+
+Future<void> delete(String fileName) async {}
+
+Future<bool> hasPublicAccess() async => false;
+
+Future<bool> requestPublicAccess() async => false;
+
+Future<String> folderPath() async => 'Files';
 
 Future<Uint8List> read(SavedPdf f) => throw UnsupportedError('web');

@@ -4,6 +4,7 @@ import '../data/store.dart';
 import '../logic/summary.dart';
 import '../models/expense.dart';
 import '../pdf/exporter.dart';
+import '../pdf/pdf_storage.dart';
 import 'widgets.dart';
 
 class MonthScreen extends StatelessWidget {
@@ -61,7 +62,10 @@ class MonthScreen extends StatelessWidget {
             ]),
             centerTitle: true,
             actions: [
-              IconButton(
+              // Android saves automatically after every change; browsers
+              // can only save through the share sheet, so keep a button there.
+              if (!PdfStorage.canSaveSilently)
+                IconButton(
                 tooltip: 'ייצוא ל-PDF',
                 icon: const Icon(Icons.picture_as_pdf),
                 onPressed: () => _export(context),

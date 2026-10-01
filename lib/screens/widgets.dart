@@ -2,6 +2,12 @@ import 'package:flutter/material.dart';
 
 const sheetGreen = Color(0xFF2E6B4F);
 
+final _numeric = RegExp(r'^-?[\d.,]+%?[*+]*$');
+
+/// Numbers are laid out left-to-right so "-12.5" keeps its minus in front
+/// inside the Hebrew (RTL) UI.
+bool isNumericCell(String s) => _numeric.hasMatch(s);
+
 /// A simple sheet-like table: green header, striped rows.
 class SheetTable extends StatelessWidget {
   final List<String> headers;
@@ -40,6 +46,7 @@ class SheetTable extends StatelessWidget {
               child: Text(
                 cells[i],
                 textAlign: TextAlign.center,
+                textDirection: isNumericCell(cells[i]) ? TextDirection.ltr : null,
                 style: (style ?? const TextStyle()).copyWith(color: color?.call(i)),
               ),
             ),

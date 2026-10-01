@@ -160,6 +160,7 @@ class PdfViewerScreen extends StatelessWidget {
         canChangePageFormat: false,
         canDebug: false,
         allowPrinting: false,
+        allowSharing: false,
         pdfFileName: name,
       ),
     );

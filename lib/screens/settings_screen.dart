@@ -58,9 +58,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 32),
           Text(
             PdfStorage.canSaveSilently
-                ? 'קבצי PDF נשמרים אוטומטית בטלפון בתיקייה ExpensesPDF של האפליקציה '
-                    '(Android/data/com.koren23.expenses_app/files/ExpensesPDF) '
-                    'בסוף כל חודש, ובכל לחיצה על כפתור ה-PDF.'
+                ? 'קובץ PDF אחד לכל חודש נשמר אוטומטית אחרי כל שינוי, '
+                    'בתיקייה Documents/expenses_app בטלפון '
+                    '(למשל expenses_2026_09.pdf).'
                 : 'בדפדפן/אייפון: בלחיצה על כפתור ה-PDF נפתח חלון שיתוף - '
                     'בחר "שמור בקבצים". בסוף חודש תופיע תזכורת לשמירה.',
             style: Theme.of(context).textTheme.bodySmall,

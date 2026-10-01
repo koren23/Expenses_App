@@ -16,3 +16,14 @@ Future<String> exportMonth(Store store, MonthKey k) async {
   await store.markExported(k);
   return where;
 }
+
+/// Brings the month's single PDF in line with the data: rewritten when the
+/// month has data, deleted when it became empty.
+Future<void> syncMonth(Store store, MonthKey k) async {
+  if (store.hasData(k)) {
+    await exportMonth(store, k);
+  } else {
+    await PdfStorage.delete(k.fileName);
+    await store.clearExported(k);
+  }
+}
