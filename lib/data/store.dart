@@ -170,11 +170,9 @@ class Store extends ChangeNotifier {
     return _save();
   }
 
-  /// Whether the month has anything worth a PDF.
+  /// Whether the month has anything worth a PDF (an income alone is not).
   bool hasData(MonthKey k) =>
-      expensesFor(k).isNotEmpty ||
-      extrasFor(k).isNotEmpty ||
-      hasIncomeOverride(k);
+      expensesFor(k).isNotEmpty || extrasFor(k).isNotEmpty;
 
   /// Months whose PDF is missing, older than their data, or should be
   /// deleted (data removed). [pastOnly] limits it to months that ended.

@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import 'pdf_export.dart';
 import 'pdf_storage.dart';
 
 const canSaveSilently = true;
@@ -81,18 +82,20 @@ Future<void> delete(String fileName) async {
 }
 
 Future<List<SavedPdf>> list() async {
-  final files = (await _dir())
-      .listSync()
-      .whereType<File>()
-      .where((f) => _monthFile.hasMatch(f.uri.pathSegments.last))
-      .map((f) => SavedPdf(
-            f.uri.pathSegments.last,
-            f.path,
-            f.lastModifiedSync(),
-          ))
-      .toList()
-    ..sort((a, b) => b.name.compareTo(a.name));
-  return files;
+  final files = <SavedPdf>[];
+  for (final f in (await _dir()).listSync().whereType<File>()) {
+    final name = f.uri.pathSegments.last;
+    if (!_monthFile.hasMatch(name)) continue;
+    // Months without expenses or additional income don't belong in the
+    // archive; such files (e.g. from older versions) are removed.
+    final b = parseMonthPdf(await f.readAsBytes());
+    if (b != null && b.expenses.isEmpty && b.extras.isEmpty) {
+      await f.delete();
+      continue;
+    }
+    files.add(SavedPdf(name, f.path, f.lastModifiedSync()));
+  }
+  return files..sort((a, b) => b.name.compareTo(a.name));
 }
 
 Future<Uint8List> read(SavedPdf f) => File(f.path).readAsBytes();

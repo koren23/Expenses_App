@@ -47,4 +47,13 @@ void main() {
     await store.clearExported(k);
     expect(store.pendingExports(), isEmpty);
   });
+
+  test('a month with only an income gets no PDF', () async {
+    SharedPreferences.setMockInitialValues({});
+    final store = await Store.load();
+    final k = MonthKey(2026, 8);
+    await store.setIncomeOverride(k, 5000);
+    expect(store.hasData(k), isFalse);
+    expect(store.pendingExports(), isNot(contains(k)));
+  });
 }

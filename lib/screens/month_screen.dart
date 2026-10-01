@@ -21,6 +21,11 @@ class MonthScreen extends StatelessWidget {
 
   Future<void> _export(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
+    if (!store.hasData(month)) {
+      messenger.showSnackBar(
+          const SnackBar(content: Text('אין נתונים בחודש הזה - לא נשמר PDF')));
+      return;
+    }
     try {
       final where = await exportMonth(store, month);
       messenger.showSnackBar(SnackBar(content: Text('PDF נשמר: $where')));
