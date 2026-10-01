@@ -10,6 +10,7 @@ Future<String> exportMonth(Store store, MonthKey k) async {
     store.expensesFor(k),
     store.incomeFor(k),
     store.hasIncomeOverride(k) ? store.incomeFor(k) : null,
+    store.extrasFor(k),
   ));
   final where = await PdfStorage.save(k.fileName, bytes);
   await store.markExported(k);

@@ -100,3 +100,36 @@ const hebrewMonths = [
 ];
 
 String monthLabel(MonthKey k) => '${hebrewMonths[k.month - 1]} ${k.year}';
+
+/// Extra income for a month on top of the regular income (הכנסה נוספת).
+class ExtraIncome {
+  final String id;
+  final int year;
+  final int month;
+  final String description;
+  final double amount;
+
+  const ExtraIncome({
+    required this.id,
+    required this.year,
+    required this.month,
+    required this.description,
+    required this.amount,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'y': year,
+        'm': month,
+        'desc': description,
+        'amt': amount,
+      };
+
+  factory ExtraIncome.fromJson(Map<String, dynamic> j) => ExtraIncome(
+        id: j['id'] as String,
+        year: j['y'] as int,
+        month: j['m'] as int,
+        description: j['desc'] as String,
+        amount: (j['amt'] as num).toDouble(),
+      );
+}

@@ -117,7 +117,8 @@ class PdfViewerScreen extends StatelessWidget {
       builder: (context) => AlertDialog(
         title: Text('שחזור ${monthLabel(b.month)}'),
         content: Text('הנתונים של ${monthLabel(b.month)} באפליקציה יוחלפו '
-            'בנתונים מהקובץ (${b.expenses.length} הוצאות). להמשיך?'),
+            'בנתונים מהקובץ (${b.expenses.length} הוצאות, '
+            '${b.extras.length} הכנסות נוספות). להמשיך?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -131,7 +132,7 @@ class PdfViewerScreen extends StatelessWidget {
       ),
     );
     if (ok != true) return;
-    await store.importMonth(b.month, b.expenses, b.incomeOverride);
+    await store.importMonth(b.month, b.expenses, b.extras, b.incomeOverride);
     if (context.mounted) {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('הנתונים שוחזרו')));

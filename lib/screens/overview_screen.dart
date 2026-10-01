@@ -64,14 +64,16 @@ class OverviewScreen extends StatelessWidget {
         var sumTotal = 0.0, sumIncome = 0.0;
         for (final k in months) {
           final total = monthTotal(store.expensesFor(k));
-          final income = store.incomeFor(k);
+          final income = store.totalIncomeFor(k);
           sumTotal += total;
           sumIncome += income;
           profits.add(income - total);
           rows.add([
             monthLabel(k),
             formatAmount(total),
-            formatAmount(income) + (store.hasIncomeOverride(k) ? '*' : ''),
+            formatAmount(income) +
+                (store.hasIncomeOverride(k) ? '*' : '') +
+                (store.extrasFor(k).isNotEmpty ? '+' : ''),
             formatAmount(income - total),
           ]);
         }
@@ -102,7 +104,8 @@ class OverviewScreen extends StatelessWidget {
               const SizedBox(height: 12),
               Text(
                 'לחיצה על חודש: שינוי הכנסה לאותו חודש או מעבר אליו.\n'
-                '* = הכנסה שונה מברירת המחדל',
+                '* = הכנסה שונה מברירת המחדל\n'
+                '+ = כולל הכנסה נוספת',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ],

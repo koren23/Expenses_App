@@ -45,13 +45,17 @@ void main() {
         File('assets/fonts/$n.ttf').readAsBytesSync().buffer.asByteData());
     final he = font('NotoSansHebrew-Regular');
     final bytes = await buildMonthPdf(
-      MonthBackup(const MonthKey(2026, 9), sept, 1456.8, 1456.8),
+      MonthBackup(const MonthKey(2026, 9), sept, 1456.8, 1456.8, const [
+        ExtraIncome(id: 'x', year: 2026, month: 9, description: 'בונוס', amount: 200),
+      ]),
       theme: pw.ThemeData.withFont(
           base: font('NotoSans-Regular'), bold: font('NotoSans-Regular'), fontFallback: [he]),
     );
     final back = parseMonthPdf(bytes)!;
     expect(back.month, const MonthKey(2026, 9));
     expect(back.incomeOverride, 1456.8);
+    expect(back.extras.single.description, 'בונוס');
+    expect(back.extraIncome, 200);
     expect(back.expenses.map((e) => e.toJson()).toList(),
         sept.map((e) => e.toJson()).toList());
     File('build/test_sept.pdf')

@@ -37,6 +37,9 @@ class MonthScreen extends StatelessWidget {
         final total = monthTotal(expenses);
         final sums = categorySums(expenses);
         final income = store.incomeFor(month);
+        final extras = store.extrasFor(month);
+        final extra = store.extraIncomeFor(month);
+        final profit = income + extra - total;
         final exported = store.exportedAt(month);
         return Scaffold(
           appBar: AppBar(
@@ -45,7 +48,12 @@ class MonthScreen extends StatelessWidget {
                 icon: const Icon(Icons.chevron_right),
                 onPressed: () => onMonthChanged(month.previous),
               ),
-              Text(monthLabel(month)),
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(monthLabel(month)),
+                ),
+              ),
               IconButton(
                 icon: const Icon(Icons.chevron_left),
                 onPressed: () => onMonthChanged(month.next),
@@ -94,13 +102,38 @@ class MonthScreen extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 24),
+              if (extras.isNotEmpty) ...[
+                SheetTable(
+                  headers: const ['הכנסה נוספת', 'סכום'],
+                  flex: const [3, 2],
+                  rows: [
+                    for (final e in extras) [e.description, formatAmount(e.amount)],
+                  ],
+                  onRowTap: (i) => _editExtra(context, extras[i]),
+                ),
+                const SizedBox(height: 8),
+              ],
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: TextButton.icon(
+                  onPressed: () => _editExtra(context, null),
+                  icon: const Icon(Icons.add),
+                  label: const Text('הוסף הכנסה נוספת'),
+                ),
+              ),
+              const SizedBox(height: 8),
               SheetTable(
-                headers: const ['הכנסה', 'הוצאות', 'רווח'],
+                headers: const ['הכנסה', 'הכנסה נוספת', 'הוצאות', 'רווח'],
                 rows: [
-                  [formatAmount(income), formatAmount(total), formatAmount(income - total)],
+                  [
+                    formatAmount(income),
+                    formatAmount(extra),
+                    formatAmount(total),
+                    formatAmount(profit),
+                  ],
                 ],
                 cellColor: (_, c) =>
-                    c == 2 && income - total < 0 ? Colors.red.shade700 : null,
+                    c == 3 && profit < 0 ? Colors.red.shade700 : null,
               ),
               const SizedBox(height: 12),
               Text(
@@ -116,6 +149,65 @@ class MonthScreen extends StatelessWidget {
         );
       },
     );
+  }
+
+  Future<void> _editExtra(BuildContext context, ExtraIncome? existing) async {
+    final desc = TextEditingController(text: existing?.description);
+    final amount = TextEditingController(
+        text: existing == null ? '' : formatAmount(existing.amount));
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(existing == null ? 'הכנסה נוספת' : 'עריכת הכנסה נוספת'),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          TextField(
+            controller: desc,
+            autofocus: existing == null,
+            decoration: const InputDecoration(labelText: 'הסבר'),
+          ),
+          TextField(
+            controller: amount,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(labelText: 'סכום'),
+          ),
+        ]),
+        actions: [
+          if (existing != null)
+            TextButton(
+              onPressed: () => Navigator.pop(context, 'delete'),
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('מחק'),
+            ),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('ביטול'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, 'save'),
+            child: const Text('שמור'),
+          ),
+        ],
+      ),
+    );
+    if (result == 'delete') {
+      await store.removeExtra(existing!);
+    } else if (result == 'save') {
+      final v = parseAmount(amount.text);
+      if (v == null) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(const SnackBar(content: Text('סכום לא תקין')));
+        }
+        return;
+      }
+      await store.upsertExtra(ExtraIncome(
+        id: existing?.id ?? DateTime.now().microsecondsSinceEpoch.toString(),
+        year: month.year,
+        month: month.month,
+        description: desc.text.trim(),
+        amount: v,
+      ));
+    }
   }
 
   Future<void> _edit(BuildContext context, Expense? existing) {

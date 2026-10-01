@@ -11,6 +11,7 @@ class Store extends ChangeNotifier {
 
   final SharedPreferences _prefs;
   final List<Expense> _expenses = [];
+  final List<ExtraIncome> _extras = [];
   double defaultIncome = 0;
   final Map<String, double> _incomeOverrides = {};
   final Map<String, int> _modifiedAt = {};
@@ -30,6 +31,10 @@ class Store extends ChangeNotifier {
       ..clear()
       ..addAll((j['expenses'] as List)
           .map((e) => Expense.fromJson(e as Map<String, dynamic>)));
+    _extras
+      ..clear()
+      ..addAll((j['extras'] as List? ?? [])
+          .map((e) => ExtraIncome.fromJson(e as Map<String, dynamic>)));
     defaultIncome = (j['defaultIncome'] as num?)?.toDouble() ?? 0;
     _incomeOverrides
       ..clear()
@@ -49,6 +54,7 @@ class Store extends ChangeNotifier {
         _key,
         jsonEncode({
           'expenses': _expenses.map((e) => e.toJson()).toList(),
+          'extras': _extras.map((e) => e.toJson()).toList(),
           'defaultIncome': defaultIncome,
           'income': _incomeOverrides,
           'modified': _modifiedAt,
@@ -68,6 +74,7 @@ class Store extends ChangeNotifier {
   List<MonthKey> get months {
     final set = {
       for (final e in _expenses) MonthKey(e.year, e.month),
+      for (final e in _extras) MonthKey(e.year, e.month),
       for (final k in _incomeOverrides.keys) MonthKey.parse(k),
       MonthKey.now(),
     };
@@ -86,6 +93,33 @@ class Store extends ChangeNotifier {
   }
 
   double incomeFor(MonthKey k) => _incomeOverrides[k.toString()] ?? defaultIncome;
+  List<ExtraIncome> extrasFor(MonthKey k) => _extras
+      .where((e) => e.year == k.year && e.month == k.month)
+      .toList();
+
+  double extraIncomeFor(MonthKey k) =>
+      extrasFor(k).fold(0.0, (s, e) => s + e.amount);
+
+  /// Regular income plus all additional income of the month.
+  double totalIncomeFor(MonthKey k) => incomeFor(k) + extraIncomeFor(k);
+
+  Future<void> upsertExtra(ExtraIncome e) {
+    final i = _extras.indexWhere((x) => x.id == e.id);
+    if (i >= 0) {
+      _extras[i] = e;
+    } else {
+      _extras.add(e);
+    }
+    _touch(MonthKey(e.year, e.month));
+    return _save();
+  }
+
+  Future<void> removeExtra(ExtraIncome e) {
+    _extras.removeWhere((x) => x.id == e.id);
+    _touch(MonthKey(e.year, e.month));
+    return _save();
+  }
+
   bool hasIncomeOverride(MonthKey k) => _incomeOverrides.containsKey(k.toString());
 
   Future<void> setIncomeOverride(MonthKey k, double? value) {
@@ -121,10 +155,12 @@ class Store extends ChangeNotifier {
   }
 
   /// Replaces a month's data with what was read from a PDF backup.
-  Future<void> importMonth(
-      MonthKey k, List<Expense> expenses, double? incomeOverride) {
+  Future<void> importMonth(MonthKey k, List<Expense> expenses,
+      List<ExtraIncome> extras, double? incomeOverride) {
     _expenses.removeWhere((e) => e.year == k.year && e.month == k.month);
     _expenses.addAll(expenses);
+    _extras.removeWhere((e) => e.year == k.year && e.month == k.month);
+    _extras.addAll(extras);
     if (incomeOverride != null) _incomeOverrides[k.toString()] = incomeOverride;
     _touch(k);
     return _save();
@@ -135,7 +171,7 @@ class Store extends ChangeNotifier {
     final now = MonthKey.now();
     return months.where((k) {
       if (k.compareTo(now) >= 0) return false;
-      if (expensesFor(k).isEmpty) return false;
+      if (expensesFor(k).isEmpty && extrasFor(k).isEmpty) return false;
       final exported = _exportedAt[k.toString()];
       final modified = _modifiedAt[k.toString()] ?? 0;
       return exported == null || exported < modified;

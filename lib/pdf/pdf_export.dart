@@ -15,7 +15,11 @@ class MonthBackup {
   final List<Expense> expenses;
   final double income;
   final double? incomeOverride;
-  const MonthBackup(this.month, this.expenses, this.income, this.incomeOverride);
+  final List<ExtraIncome> extras;
+  const MonthBackup(this.month, this.expenses, this.income, this.incomeOverride,
+      [this.extras = const []]);
+
+  double get extraIncome => extras.fold(0.0, (s, e) => s + e.amount);
 }
 
 pw.ThemeData? _theme;
@@ -42,6 +46,7 @@ Future<Uint8List> buildMonthPdf(MonthBackup b, {pw.ThemeData? theme}) async {
     'month': b.month.toString(),
     'income': b.incomeOverride,
     'expenses': b.expenses.map((e) => e.toJson()).toList(),
+    'extras': b.extras.map((e) => e.toJson()).toList(),
   })));
 
   final doc = pw.Document(
@@ -96,11 +101,25 @@ Future<Uint8List> buildMonthPdf(MonthBackup b, {pw.ThemeData? theme}) async {
             [s.category, formatAmount(s.sum), formatPercent(s.fraction)],
         ],
       ),
+      if (b.extras.isNotEmpty) ...[
+        pw.SizedBox(height: 20),
+        table(
+          ['הכנסה נוספת', 'סכום'],
+          [
+            for (final e in b.extras) [e.description, formatAmount(e.amount)],
+          ],
+        ),
+      ],
       pw.SizedBox(height: 20),
       table(
-        ['הכנסה', 'הוצאות', 'רווח'],
+        ['הכנסה', 'הכנסה נוספת', 'הוצאות', 'רווח'],
         [
-          [formatAmount(b.income), formatAmount(total), formatAmount(b.income - total)],
+          [
+            formatAmount(b.income),
+            formatAmount(b.extraIncome),
+            formatAmount(total),
+            formatAmount(b.income + b.extraIncome - total),
+          ],
         ],
       ),
     ],
@@ -126,6 +145,9 @@ MonthBackup? parseMonthPdf(Uint8List bytes) {
           .toList(),
       income ?? 0,
       income,
+      (j['extras'] as List? ?? [])
+          .map((e) => ExtraIncome.fromJson(e as Map<String, dynamic>))
+          .toList(),
     );
   } catch (_) {
     return null;
