@@ -12,7 +12,7 @@ A simple Hebrew (RTL) monthly expenses tracker, modelled on a Google Sheet:
 - **Android:** exactly one `expenses_YYYY_MM.pdf` per month. It is rewritten automatically about 2 seconds after every change. If a month's data is removed, its PDF is deleted. There is no manual save button.
 - Each PDF embeds the month's raw data, so it can be imported back.
 - **Android:** PDFs are written to `Documents/expenses_app/`. This needs "All files access", which the app asks for once. If access is denied, PDFs go to the app's private folder.
-- **iPhone (PWA):** browsers can't write files on their own, so the share sheet opens – choose "Save to Files". At month end the app shows a reminder.
+- **iPhone (PWA):** open https://koren23.github.io/Expenses_App/ in Safari → Share → "Add to Home Screen". It is rebuilt automatically on every push (`.github/workflows/pages.yml`). For PDFs, browsers can't write files on their own, so the share sheet opens – choose "Save to Files". At month end the app shows a reminder.
 
 ## Build
 ```
