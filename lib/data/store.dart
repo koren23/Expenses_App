@@ -5,9 +5,40 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/expense.dart';
 
+/// A month's data as it was before a change.
+class MonthVersion {
+  final DateTime savedAt;
+  final List<Expense> expenses;
+  final List<ExtraIncome> extras;
+  final double? incomeOverride;
+
+  const MonthVersion(this.savedAt, this.expenses, this.extras, this.incomeOverride);
+
+  Map<String, dynamic> toJson() => {
+        't': savedAt.millisecondsSinceEpoch,
+        'e': expenses.map((e) => e.toJson()).toList(),
+        'x': extras.map((e) => e.toJson()).toList(),
+        if (incomeOverride != null) 'i': incomeOverride,
+      };
+
+  factory MonthVersion.fromJson(Map<String, dynamic> j) => MonthVersion(
+        DateTime.fromMillisecondsSinceEpoch(j['t'] as int),
+        (j['e'] as List)
+            .map((e) => Expense.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        (j['x'] as List)
+            .map((e) => ExtraIncome.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        (j['i'] as num?)?.toDouble(),
+      );
+}
+
 /// All app data, persisted locally as JSON (localStorage on web).
 class Store extends ChangeNotifier {
   static const _key = 'expenses_app_v1';
+
+  /// How many previous versions are kept per month.
+  static const maxVersions = 10;
 
   final SharedPreferences _prefs;
   final List<Expense> _expenses = [];
@@ -16,6 +47,7 @@ class Store extends ChangeNotifier {
   final Map<String, double> _incomeOverrides = {};
   final Map<String, int> _modifiedAt = {};
   final Map<String, int> _exportedAt = {};
+  final Map<String, List<MonthVersion>> _history = {};
 
   Store._(this._prefs);
 
@@ -46,6 +78,13 @@ class Store extends ChangeNotifier {
     _exportedAt
       ..clear()
       ..addAll((j['exported'] as Map? ?? {}).cast<String, int>());
+    _history
+      ..clear()
+      ..addAll((j['history'] as Map? ?? {}).map((k, v) => MapEntry(
+          k as String,
+          (v as List)
+              .map((e) => MonthVersion.fromJson(e as Map<String, dynamic>))
+              .toList())));
   }
 
   Future<void> _save() async {
@@ -59,11 +98,31 @@ class Store extends ChangeNotifier {
           'income': _incomeOverrides,
           'modified': _modifiedAt,
           'exported': _exportedAt,
+          'history': _history.map(
+              (k, v) => MapEntry(k, v.map((e) => e.toJson()).toList())),
         }));
   }
 
   void _touch(MonthKey k) =>
       _modifiedAt[k.toString()] = DateTime.now().millisecondsSinceEpoch;
+
+  /// Remembers the month as it is now, right before it is changed.
+  void _snapshot(MonthKey k) {
+    if (!hasData(k)) return;
+    final list = _history.putIfAbsent(k.toString(), () => []);
+    list.insert(
+        0,
+        MonthVersion(DateTime.now(), expensesFor(k), extrasFor(k),
+            _incomeOverrides[k.toString()]));
+    if (list.length > maxVersions) list.removeRange(maxVersions, list.length);
+  }
+
+  /// Previous versions of the month, newest first.
+  List<MonthVersion> versionsFor(MonthKey k) =>
+      List.unmodifiable(_history[k.toString()] ?? const []);
+
+  Future<void> restoreVersion(MonthKey k, MonthVersion v) =>
+      importMonth(k, v.expenses, v.extras, v.incomeOverride);
 
   List<Expense> expensesFor(MonthKey k) => _expenses
       .where((e) => e.year == k.year && e.month == k.month)
@@ -104,6 +163,7 @@ class Store extends ChangeNotifier {
   double totalIncomeFor(MonthKey k) => incomeFor(k) + extraIncomeFor(k);
 
   Future<void> upsertExtra(ExtraIncome e) {
+    _snapshot(MonthKey(e.year, e.month));
     final i = _extras.indexWhere((x) => x.id == e.id);
     if (i >= 0) {
       _extras[i] = e;
@@ -115,6 +175,7 @@ class Store extends ChangeNotifier {
   }
 
   Future<void> removeExtra(ExtraIncome e) {
+    _snapshot(MonthKey(e.year, e.month));
     _extras.removeWhere((x) => x.id == e.id);
     _touch(MonthKey(e.year, e.month));
     return _save();
@@ -123,6 +184,7 @@ class Store extends ChangeNotifier {
   bool hasIncomeOverride(MonthKey k) => _incomeOverrides.containsKey(k.toString());
 
   Future<void> setIncomeOverride(MonthKey k, double? value) {
+    _snapshot(k);
     if (value == null) {
       _incomeOverrides.remove(k.toString());
     } else {
@@ -142,6 +204,7 @@ class Store extends ChangeNotifier {
   }
 
   Future<void> upsert(Expense e) {
+    _snapshot(MonthKey(e.year, e.month));
     final i = _expenses.indexWhere((x) => x.id == e.id);
     if (i >= 0) {
       _expenses[i] = e;
@@ -153,6 +216,7 @@ class Store extends ChangeNotifier {
   }
 
   Future<void> remove(Expense e) {
+    _snapshot(MonthKey(e.year, e.month));
     _expenses.removeWhere((x) => x.id == e.id);
     _touch(MonthKey(e.year, e.month));
     return _save();
@@ -161,11 +225,16 @@ class Store extends ChangeNotifier {
   /// Replaces a month's data with what was read from a PDF backup.
   Future<void> importMonth(MonthKey k, List<Expense> expenses,
       List<ExtraIncome> extras, double? incomeOverride) {
+    _snapshot(k);
     _expenses.removeWhere((e) => e.year == k.year && e.month == k.month);
     _expenses.addAll(expenses);
     _extras.removeWhere((e) => e.year == k.year && e.month == k.month);
     _extras.addAll(extras);
-    if (incomeOverride != null) _incomeOverrides[k.toString()] = incomeOverride;
+    if (incomeOverride != null) {
+      _incomeOverrides[k.toString()] = incomeOverride;
+    } else {
+      _incomeOverrides.remove(k.toString());
+    }
     _touch(k);
     return _save();
   }

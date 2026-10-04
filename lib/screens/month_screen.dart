@@ -5,9 +5,12 @@ import '../logic/summary.dart';
 import '../models/expense.dart';
 import '../pdf/exporter.dart';
 import '../pdf/pdf_storage.dart';
+import 'versions_screen.dart';
 import 'widgets.dart';
 
-class MonthScreen extends StatelessWidget {
+enum _Sort { date, amount, category }
+
+class MonthScreen extends StatefulWidget {
   final Store store;
   final MonthKey month;
   final ValueChanged<MonthKey> onMonthChanged;
@@ -18,6 +21,54 @@ class MonthScreen extends StatelessWidget {
     required this.month,
     required this.onMonthChanged,
   });
+
+  @override
+  State<MonthScreen> createState() => _MonthScreenState();
+}
+
+class _MonthScreenState extends State<MonthScreen> {
+  Store get store => widget.store;
+  MonthKey get month => widget.month;
+  ValueChanged<MonthKey> get onMonthChanged => widget.onMonthChanged;
+
+  _Sort _sort = _Sort.date;
+  bool _ascending = true;
+
+  /// Column of the expenses table that belongs to each sort mode.
+  static const _sortColumns = {1: _Sort.date, 2: _Sort.amount, 3: _Sort.category};
+
+  void _onHeaderTap(int col) {
+    final sort = _sortColumns[col];
+    if (sort == null) return;
+    setState(() {
+      if (sort == _sort) {
+        _ascending = !_ascending;
+      } else {
+        _sort = sort;
+        // Amounts start with the largest expense.
+        _ascending = sort != _Sort.amount;
+      }
+    });
+  }
+
+  /// Display order only; the PDF always stays in date order.
+  List<Expense> _sorted(List<Expense> byDate) {
+    final list = [...byDate];
+    final dir = _ascending ? 1 : -1;
+    switch (_sort) {
+      case _Sort.date:
+        if (!_ascending) return list.reversed.toList();
+      case _Sort.amount:
+        list.sort((a, b) => dir * a.amount.compareTo(b.amount));
+      case _Sort.category:
+        // Same category together, by date inside each group.
+        list.sort((a, b) {
+          final c = dir * a.category.trim().compareTo(b.category.trim());
+          return c != 0 ? c : a.day.compareTo(b.day);
+        });
+    }
+    return list;
+  }
 
   Future<void> _export(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
@@ -39,9 +90,10 @@ class MonthScreen extends StatelessWidget {
     return ListenableBuilder(
       listenable: store,
       builder: (context, _) {
-        final expenses = store.expensesFor(month);
-        final total = monthTotal(expenses);
-        final sums = categorySums(expenses);
+        final byDate = store.expensesFor(month);
+        final expenses = _sorted(byDate);
+        final total = monthTotal(byDate);
+        final sums = categorySums(byDate);
         final income = store.incomeFor(month);
         final extras = store.extrasFor(month);
         final extra = store.extraIncomeFor(month);
@@ -67,6 +119,13 @@ class MonthScreen extends StatelessWidget {
             ]),
             centerTitle: true,
             actions: [
+              IconButton(
+                tooltip: 'גרסאות קודמות',
+                icon: const Icon(Icons.history),
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => VersionsScreen(store: store, month: month),
+                )),
+              ),
               // Android saves automatically after every change; browsers
               // can only save through the share sheet, so keep a button there.
               if (!PdfStorage.canSaveSilently)
@@ -99,6 +158,10 @@ class MonthScreen extends StatelessWidget {
                       [e.description, '${e.day}', formatAmount(e.amount), e.category],
                   ],
                   onRowTap: (i) => _edit(context, expenses[i]),
+                  onHeaderTap: _onHeaderTap,
+                  sortColumn: _sortColumns.keys
+                      .firstWhere((c) => _sortColumns[c] == _sort),
+                  sortAscending: _ascending,
                 ),
               const SizedBox(height: 24),
               SheetTable(
@@ -199,7 +262,11 @@ class MonthScreen extends StatelessWidget {
       ),
     );
     if (result == 'delete') {
-      await store.removeExtra(existing!);
+      if (context.mounted &&
+          await confirmDelete(
+              context, 'ההכנסה הנוספת "${existing!.description}"')) {
+        await store.removeExtra(existing);
+      }
     } else if (result == 'save') {
       final v = parseAmount(amount.text);
       if (v == null) {
@@ -276,7 +343,9 @@ class _ExpenseFormState extends State<_ExpenseForm> {
   }
 
   Future<void> _delete() async {
-    await widget.store.remove(widget.existing!);
+    final e = widget.existing!;
+    if (!await confirmDelete(context, 'ההוצאה "${e.description}"')) return;
+    await widget.store.remove(e);
     if (mounted) Navigator.pop(context);
   }
 

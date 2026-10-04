@@ -7,6 +7,7 @@ import '../data/store.dart';
 import '../models/expense.dart';
 import '../pdf/pdf_export.dart';
 import '../pdf/pdf_storage.dart';
+import 'versions_screen.dart';
 
 /// Lists the monthly PDFs saved on the phone and opens them.
 class ArchiveScreen extends StatefulWidget {
@@ -104,11 +105,15 @@ class PdfViewerScreen extends StatelessWidget {
   final String name;
   final Uint8List bytes;
 
+  /// Offer the month's previous versions (off when already viewing one).
+  final bool showHistory;
+
   const PdfViewerScreen({
     super.key,
     required this.store,
     required this.name,
     required this.bytes,
+    this.showHistory = true,
   });
 
   Future<void> _import(BuildContext context, MonthBackup b) async {
@@ -146,6 +151,15 @@ class PdfViewerScreen extends StatelessWidget {
       appBar: AppBar(
         title: Text(backup == null ? name : monthLabel(backup.month)),
         actions: [
+          if (backup != null && showHistory)
+            IconButton(
+              tooltip: 'גרסאות קודמות',
+              icon: const Icon(Icons.history),
+              onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) =>
+                    VersionsScreen(store: store, month: backup.month),
+              )),
+            ),
           if (backup != null)
             IconButton(
               tooltip: 'שחזר נתונים לאפליקציה',
